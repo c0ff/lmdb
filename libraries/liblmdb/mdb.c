@@ -4481,7 +4481,9 @@ mdb_env_setup_locks(MDB_env *env, char *lpath, int mode, int *excl)
 	off_t size, rsize;
 
 #ifdef _WIN32
-	env->me_lfd = CreateFileA(lpath, GENERIC_READ|GENERIC_WRITE,
+	wchar_t wpath[MAX_PATH];
+	MultiByteToWideChar(CP_UTF8, 0, lpath, -1, wpath, MAX_PATH);
+	env->me_lfd = CreateFileW(wpath, GENERIC_READ|GENERIC_WRITE,
 		FILE_SHARE_READ|FILE_SHARE_WRITE, NULL, OPEN_ALWAYS,
 		FILE_ATTRIBUTE_NORMAL, NULL);
 #else
@@ -4734,6 +4736,9 @@ mdb_env_open(MDB_env *env, const char *path, unsigned int flags, mdb_mode_t mode
 {
 	int		oflags, rc, len, excl = -1;
 	char *lpath, *dpath;
+#ifdef _WIN32
+	wchar_t wpath[MAX_PATH];
+#endif
 
 	if (env->me_fd!=INVALID_HANDLE_VALUE || (flags & ~(CHANGEABLE|CHANGELESS)))
 		return EINVAL;
@@ -4789,6 +4794,7 @@ mdb_env_open(MDB_env *env, const char *path, unsigned int flags, mdb_mode_t mode
 	}
 
 #ifdef _WIN32
+	MultiByteToWideChar(CP_UTF8, 0, dpath, -1, wpath, MAX_PATH);
 	if (F_ISSET(flags, MDB_RDONLY)) {
 		oflags = GENERIC_READ;
 		len = OPEN_EXISTING;
@@ -4797,7 +4803,7 @@ mdb_env_open(MDB_env *env, const char *path, unsigned int flags, mdb_mode_t mode
 		len = OPEN_ALWAYS;
 	}
 	mode = FILE_ATTRIBUTE_NORMAL;
-	env->me_fd = CreateFileA(dpath, oflags, FILE_SHARE_READ|FILE_SHARE_WRITE,
+	env->me_fd = CreateFileW(wpath, oflags, FILE_SHARE_READ | FILE_SHARE_WRITE,
 		NULL, len, mode, NULL);
 #else
 	if (F_ISSET(flags, MDB_RDONLY))
@@ -4827,7 +4833,7 @@ mdb_env_open(MDB_env *env, const char *path, unsigned int flags, mdb_mode_t mode
 			 */
 #ifdef _WIN32
 			len = OPEN_EXISTING;
-			env->me_mfd = CreateFileA(dpath, oflags,
+			env->me_mfd = CreateFileW(wpath, oflags,
 				FILE_SHARE_READ|FILE_SHARE_WRITE, NULL, len,
 				mode | FILE_FLAG_WRITE_THROUGH, NULL);
 #else
@@ -9123,6 +9129,9 @@ mdb_env_copy2(MDB_env *env, const char *path, unsigned int flags)
 	int rc, len;
 	char *lpath;
 	HANDLE newfd = INVALID_HANDLE_VALUE;
+#ifdef _WIN32
+	wchar_t wpath[MAX_PATH];
+#endif
 
 	if (env->me_flags & MDB_NOSUBDIR) {
 		lpath = (char *)path;
@@ -9140,7 +9149,8 @@ mdb_env_copy2(MDB_env *env, const char *path, unsigned int flags)
 	 * already in the OS cache.
 	 */
 #ifdef _WIN32
-	newfd = CreateFileA(lpath, GENERIC_WRITE, 0, NULL, CREATE_NEW,
+	MultiByteToWideChar(CP_UTF8, 0, lpath, -1, wpath, MAX_PATH);
+	newfd = CreateFileW(wpath, GENERIC_WRITE, 0, NULL, CREATE_NEW,
 				FILE_FLAG_NO_BUFFERING|FILE_FLAG_WRITE_THROUGH, NULL);
 #else
 	newfd = open(lpath, O_WRONLY|O_CREAT|O_EXCL, 0666);
